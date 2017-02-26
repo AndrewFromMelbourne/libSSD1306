@@ -46,7 +46,7 @@
 
 //-------------------------------------------------------------------------
 
-namespace 
+namespace
 {
 volatile static std::sig_atomic_t run = 1;
 

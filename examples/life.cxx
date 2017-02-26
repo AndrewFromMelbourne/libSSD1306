@@ -25,12 +25,15 @@
 //
 //-------------------------------------------------------------------------
 
+#include <cmath>
+#include <csignal>
+#include <cstring>
+#include <iostream>
+#include <system_error>
+
 #include "OledBitmap.h"
 #include "OledI2C.h"
 #include "LinuxKeys.h"
-
-#include <cmath>
-#include <iostream>
 
 //-------------------------------------------------------------------------
 
@@ -38,6 +41,29 @@ using Bitmap = SSD1306::OledBitmap<SSD1306::OledI2C::Width,
                                    SSD1306::OledI2C::Height>;
 
 using Point = SSD1306::OledPoint;
+
+//-------------------------------------------------------------------------
+
+namespace
+{
+volatile static std::sig_atomic_t run = 1;
+}
+
+//-------------------------------------------------------------------------
+
+static void
+signalHandler(
+    int signalNumber)
+{
+    switch (signalNumber)
+    {
+    case SIGINT:
+    case SIGTERM:
+
+        run = 0;
+        break;
+    };
+}
 
 //-------------------------------------------------------------------------
 
@@ -178,6 +204,22 @@ main()
 {
     try
     {
+        constexpr std::array<int, 2> signals{SIGINT, SIGTERM};
+
+        for (auto signal : signals)
+        {
+            if (std::signal(signal, signalHandler) == SIG_ERR)
+            {
+                std::string what{"installing "};
+                what += strsignal(signal);
+                what += " signal handler";
+
+                throw std::system_error(errno,
+                                        std::system_category(),
+                                        what);
+            }
+        }
+
        SSD1306::OledI2C oled{"/dev/i2c-1", 0x3C};
 
         Bitmap pixels;
@@ -191,7 +233,7 @@ main()
 
         //-----------------------------------------------------------------
 
-        while(key.key != 27)
+        while (run)
         {
             key = linuxKeys.pressed();
         
@@ -212,6 +254,11 @@ main()
                 case '-':
 
                     oled.displayOff();
+                    break;
+
+                case 27:
+
+                    run = 0;
                     break;
                 }
             }
